@@ -1,0 +1,7 @@
+# 手元だけの設定
+.claude/settings.local.json
+
+# OS が勝手に置くもの
+Thumbs.db
+desktop.ini
+.DS_Store

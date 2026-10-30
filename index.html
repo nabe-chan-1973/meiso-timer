@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#070c12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="瞑想">
+<title>瞑想</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500&family=Zen+Old+Mincho:wght@400;600&display=swap">
+<style>
+/* ============================================================
+   習慣を記録する画面のひな形
+   WimHof呼吸法アプリ（https://github.com/nabe-chan-1973/wimhof-breathing）
+   から、記録画面だけを取り出して汎用化したもの。
+   このファイル単体で動く。別のアプリに持っていくときは、
+   下の APP だけ書き換えれば中身は触らなくてよい。
+   ============================================================ */
+:root{
+  --bg:#070c12;        /* 地色 */
+  --bg-2:#0b131c;      /* カードの背景 */
+  --line:#132030;      /* 未実施の升目・区切り線 */
+  --text:#dfe8ef;
+  --text-2:#9fb2c1;
+  --text-3:#63798a;    /* 補助文字 */
+  --accent:#e2845c;    /* 実施した日の色。1色決めて濃淡で使う */
+  --f-disp:"Zen Old Mincho", "Yu Mincho", serif;
+  --f-body:"Zen Kaku Gothic New", "Hiragino Sans", system-ui, sans-serif;
+}
+*{box-sizing:border-box}
+/* ★ これが無いと、flex を使った要素は hidden を付けても消えない */
+[hidden]{display:none !important}
+body{
+  margin:0; min-height:100vh; background:var(--bg); color:var(--text);
+  font-family:var(--f-body); -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:520px; margin:0 auto; padding:26px 20px 60px}
+
+h1{margin:0 0 22px; font-family:var(--f-disp); font-size:21px; font-weight:600; letter-spacing:.06em}
+.eyebrow{font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--text-3); font-weight:500}
+
+/* ---------- 数字カード3枚 ---------- */
+.nums{display:flex; gap:9px}
+.num{
+  flex:1; background:var(--bg-2); border-radius:14px; padding:17px 8px;
+  display:flex; flex-direction:column; align-items:center; gap:7px;
+}
+.num b{
+  font-family:var(--f-disp); font-weight:400; font-size:31px; line-height:1;
+  font-variant-numeric:tabular-nums;
+}
+.num.hot b{color:var(--accent)}            /* 連続が伸びたら色が変わる */
+.num span{font-size:10.5px; color:var(--text-3); letter-spacing:.12em}
+
+/* ---------- 格子 ---------- */
+.grid-wrap{margin-top:28px; display:flex; flex-direction:column; gap:11px}
+.grid{display:flex; gap:5px}
+.grid .wd{display:flex; flex-direction:column; gap:5px; padding-right:3px}
+.grid .wd i{height:17px; line-height:17px; font-style:normal; font-size:9px; color:var(--text-3)}
+.grid .cols{display:flex; gap:5px; flex:1; overflow-x:auto}
+.grid .col{display:flex; flex-direction:column; gap:5px}
+.grid .d{width:17px; height:17px; border-radius:4px; background:var(--line); flex:none}
+.grid .d.l1{background:color-mix(in srgb, var(--accent) 32%, transparent)}
+.grid .d.l2{background:color-mix(in srgb, var(--accent) 62%, transparent)}
+.grid .d.l3{background:var(--accent)}
+.grid .d.none{background:transparent}      /* まだ来ていない日 */
+.grid .d.today{box-shadow:0 0 0 1.5px var(--text-3)}
+.legend{display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--text-3)}
+.legend i{width:11px; height:11px; border-radius:3px; display:inline-block}
+
+/* ---------- 一覧 ---------- */
+.list{margin-top:28px; display:flex; flex-direction:column; gap:1px;
+  background:var(--line); border-radius:14px; overflow:hidden}
+.row{background:var(--bg-2); padding:13px 15px; display:flex;
+  align-items:baseline; justify-content:space-between; gap:14px}
+.row .dt{font-size:12.5px; color:var(--text-3); letter-spacing:.04em; white-space:nowrap}
+.row .vl{font-size:13px; color:var(--text-2); text-align:right;
+  font-variant-numeric:tabular-nums; letter-spacing:.05em}
+.empty{color:var(--text-3); font-size:13px; line-height:1.8; text-align:center; padding:40px 0}
+
+/* ---------- 書き出し・読み込み ---------- */
+.backup{margin-top:30px; border-top:1px solid var(--line); padding-top:20px;
+  display:flex; flex-direction:column; gap:13px}
+.backup h2{margin:0; font-size:11px; letter-spacing:.22em; text-transform:uppercase;
+  color:var(--text-3); font-weight:500}
+.backup p{margin:0; font-size:12px; line-height:1.75; color:var(--text-3)}
+.backup p.warn{color:var(--accent)}
+.btns{display:flex; gap:9px}
+.btn{
+  flex:1; padding:14px 10px; border-radius:12px; background:transparent;
+  border:1px solid #1a2836; color:var(--text-2); font:inherit; font-size:14px;
+  letter-spacing:.04em; cursor:pointer;
+}
+.btn:active{background:var(--bg-2)}
+.msg{font-size:12.5px; line-height:1.7; color:#7fc7e8; min-height:1.2em}
+
+/* ============================================================
+   ここから瞑想アプリ本体（タイマー・設定・タブ）
+   ============================================================ */
+button{touch-action:manipulation; -webkit-tap-highlight-color:transparent}
+.wrap{padding-top:calc(18px + env(safe-area-inset-top));
+  padding-bottom:calc(40px + env(safe-area-inset-bottom))}
+
+.tabs{display:flex; gap:4px; background:var(--bg-2); border-radius:12px; padding:4px; margin-bottom:26px}
+.tabs button{flex:1; padding:10px 0; border:0; border-radius:9px; background:transparent;
+  color:var(--text-3); font:inherit; font-size:13.5px; letter-spacing:.12em; cursor:pointer}
+.tabs button.on{background:var(--line); color:var(--text)}
+
+.tm{display:flex; flex-direction:column; align-items:center}
+.tm-phase{font-family:var(--f-disp); font-size:19px; letter-spacing:.3em; color:var(--text-2);
+  min-height:1.5em; margin-top:4px}
+.tm-ring{position:relative; width:min(78vw, 300px); aspect-ratio:1; margin:18px 0 8px}
+.tm-ring svg{width:100%; height:100%; transform:rotate(-90deg)}
+.tm-ring circle{fill:none; stroke-width:3}
+.tm-ring .bg{stroke:var(--line)}
+.tm-ring .fg{stroke:var(--accent); stroke-linecap:round; transition:stroke-dashoffset .3s linear}
+.tm-ring.prep .fg{stroke:var(--text-3)}
+.tm-ring.wake .fg{stroke:#7fc7e8}
+.tm-time{position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:10px}
+.tm-time b{font-family:var(--f-disp); font-weight:400; font-size:min(15vw, 58px);
+  line-height:1; font-variant-numeric:tabular-nums; letter-spacing:.02em}
+.tm-time span{font-size:11.5px; color:var(--text-3); letter-spacing:.14em; min-height:1.2em}
+
+.steps{display:flex; gap:6px; margin:6px 0 4px}
+.steps i{width:7px; height:7px; border-radius:50%; background:var(--line)}
+.steps i.on{background:var(--accent)}
+
+.set{width:100%; margin-top:22px; display:flex; flex-direction:column; gap:1px;
+  background:var(--line); border-radius:14px; overflow:hidden}
+.set-row{background:var(--bg-2); padding:12px 12px 12px 16px; display:flex;
+  align-items:center; justify-content:space-between; gap:10px}
+.set-row label{font-size:13px; color:var(--text-2); letter-spacing:.06em}
+.set-row small{display:block; font-size:10.5px; color:var(--text-3); margin-top:3px; letter-spacing:.04em}
+.stp{display:flex; align-items:center; gap:4px}
+.stp output{min-width:84px; text-align:center; font-variant-numeric:tabular-nums;
+  font-size:15px; letter-spacing:.04em}
+.stp button{width:40px; height:40px; border-radius:50%; border:1px solid #1a2836;
+  background:transparent; color:var(--text-2); font-size:20px; line-height:1; cursor:pointer;
+  user-select:none; -webkit-user-select:none}
+.stp button:active{background:var(--line)}
+
+.main{width:100%; margin-top:24px; padding:18px 0; border-radius:14px; border:0;
+  background:var(--accent); color:#1a0e08; font:inherit; font-size:16px; font-weight:500;
+  letter-spacing:.3em; cursor:pointer}
+.main.stop{background:transparent; border:1px solid #1a2836; color:var(--text-2)}
+.sub{width:100%; margin-top:10px}
+.ask{width:100%; margin-top:18px; background:var(--bg-2); border-radius:14px; padding:18px 16px;
+  display:flex; flex-direction:column; gap:14px}
+.ask p{margin:0; font-size:13.5px; line-height:1.7; color:var(--text-2); text-align:center}
+.done-msg{margin-top:16px; font-size:13px; line-height:1.8; color:var(--text-2); text-align:center; min-height:1.8em}
+.hint{margin-top:18px; font-size:11.5px; line-height:1.75; color:var(--text-3); text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="tabs">
+    <button id="tabTimer" class="on">瞑想</button>
+    <button id="tabRecord">記録</button>
+  </nav>
+
+  <!-- タイマー -->
+  <section id="viewTimer" class="tm">
+    <div class="tm-phase" id="tmPhase">静かに座る</div>
+    <div class="tm-ring" id="tmRing">
+      <svg viewBox="0 0 200 200" aria-hidden="true">
+        <circle class="bg" cx="100" cy="100" r="92"></circle>
+        <circle class="fg" id="tmArc" cx="100" cy="100" r="92"></circle>
+      </svg>
+      <div class="tm-time"><b id="tmTime">20:00</b><span id="tmNext"></span></div>
+    </div>
+    <div class="steps" id="tmSteps"><i></i><i></i><i></i></div>
+
+    <div class="set" id="tmSet">
+      <div class="set-row">
+        <label>はじまりまで<small>1回目のチャイムまで</small></label>
+        <div class="stp" data-k="interval"><button data-d="-1">−</button><output></output><button data-d="1">+</button></div>
+      </div>
+      <div class="set-row">
+        <label>瞑想<small>2回目のチャイムまで</small></label>
+        <div class="stp" data-k="med"><button data-d="-1">−</button><output></output><button data-d="1">+</button></div>
+      </div>
+      <div class="set-row">
+        <label>覚醒<small>3回目のチャイムまで</small></label>
+        <div class="stp" data-k="wake"><button data-d="-1">−</button><output></output><button data-d="1">+</button></div>
+      </div>
+    </div>
+
+    <button class="main" id="tmMain">スタート</button>
+    <button class="btn sub" id="tmTest">チャイムを試す</button>
+
+    <div class="ask" id="tmAsk" hidden>
+      <p id="tmAskText"></p>
+      <div class="btns">
+        <button class="btn" id="tmAskSave">記録する</button>
+        <button class="btn" id="tmAskDrop">記録しない</button>
+      </div>
+    </div>
+    <div class="done-msg" id="tmDone"></div>
+    <p class="hint" id="tmHint">瞑想中は画面が消えないようにしています。<br>マナーモードでもチャイムは鳴ります（音量はご確認ください）。</p>
+  </section>
+
+  <!-- 記録（ひな形） -->
+  <section id="viewRecord" hidden>
+    <h1>瞑想の記録</h1>
+    <div id="screen"></div>
+  </section>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   ここだけ書き換えれば、別のアプリに移植できる
+   ============================================================ */
+const APP = {
+  storeKey: "meditation.log",    // localStorage のキー
+  backupKey: "meditation.at",    // 最後に書き出した日
+  fileName: "meditation",        // 書き出すファイル名の頭
+  weeks: 13,                     // 格子に並べる週数（13週＝約3か月）
+  // 1件は { t:保存時刻(ms), d:"YYYY-MM-DD", v:[数値...] }。
+  // v はその日に瞑想した分数。1日に2回やれば [20, 15] のように並ぶ。
+  levels: [15, 30],              // その日の v の合計（分）が 15以下/30以下/30超 で3段階
+  fmt: v => v + "分",            // 一覧での1件の見せ方
+  labels: ["連続日数", "のべ日数", "最長連続"],
+  hotAt: 3                       // 連続がこの日数以上で色を変える
+};
+
+/* ============================================================
+   日付
+   ★ toISOString() は UTC。日本時間の朝9時前に実施すると前日として
+     記録され、連続日数が途切れる。必ずローカル時刻で作ること。
+   ============================================================ */
+function dkey(d){
+  return d.getFullYear() + "-" +
+    String(d.getMonth() + 1).padStart(2, "0") + "-" +
+    String(d.getDate()).padStart(2, "0");
+}
+function dparse(s){ const a = s.split("-").map(Number); return new Date(a[0], a[1] - 1, a[2]); }
+function dshift(s, n){ const d = dparse(s); d.setDate(d.getDate() + n); return dkey(d); }
+
+/* ============================================================
+   保存と集計
+   ============================================================ */
+function load(){
+  try{ return JSON.parse(localStorage.getItem(APP.storeKey) || "[]"); }catch(e){ return []; }
+}
+function store(list){
+  try{ localStorage.setItem(APP.storeKey, JSON.stringify(list.slice(0, 2000))); return true; }
+  catch(e){ return false; }
+}
+// 1回ぶんを足す。アプリ本体からはこれを呼ぶ。
+function addRecord(values){
+  const list = load();
+  list.unshift({ t: Date.now(), d: dkey(new Date()), v: values });
+  store(list);
+}
+
+function stats(){
+  const list = load();
+  const byDay = {};
+  list.forEach(x => {
+    if(!byDay[x.d]) byDay[x.d] = { sum: 0, n: 0 };
+    byDay[x.d].sum += (x.v || []).reduce((a, b) => a + b, 0);
+    byDay[x.d].n++;
+  });
+  const days = Object.keys(byDay).sort();
+
+  // 連続日数。今日まだなら昨日から数える
+  // （実施前に「0日」と出ると気が滅入るので）
+  let streak = 0, cur = dkey(new Date());
+  if(!byDay[cur]) cur = dshift(cur, -1);
+  while(byDay[cur]){ streak++; cur = dshift(cur, -1); }
+
+  // 最長連続
+  let best = 0, run = 0, prev = null;
+  days.forEach(d => {
+    run = (prev && dshift(prev, 1) === d) ? run + 1 : 1;
+    if(run > best) best = run;
+    prev = d;
+  });
+
+  return { streak, total: days.length, best, sessions: list.length, byDay, list };
+}
+
+/* ============================================================
+   書き出しと読み込み
+   ★ 読み込みは差分を足すだけにする。上書きにすると、バックアップを
+     取ったあとに増えた記録が消えてしまう。
+   ============================================================ */
+function payload(){
+  return JSON.stringify({ app: APP.storeKey, version: 1,
+    exportedAt: new Date().toISOString(), log: load() }, null, 1);
+}
+function markBackup(){ try{ localStorage.setItem(APP.backupKey, dkey(new Date())); }catch(e){} }
+function backupAge(){
+  let at = null;
+  try{ at = localStorage.getItem(APP.backupKey); }catch(e){}
+  return at ? Math.round((dparse(dkey(new Date())) - dparse(at)) / 86400000) : null;
+}
+function backupOverdue(){
+  const age = backupAge();
+  return stats().total > 0 && (age === null || age >= 30);
+}
+
+async function exportData(note){
+  const json = payload(), name = APP.fileName + "-" + dkey(new Date()) + ".json";
+  // スマホは共有シートがいちばん確実。
+  // iOS のホーム画面アプリはダウンロードが効かないことがある。
+  try{
+    const file = new File([json], name, { type: "application/json" });
+    if(navigator.canShare && navigator.canShare({ files: [file] })){
+      await navigator.share({ files: [file] });
+      markBackup(); note("書き出しました。"); return;
+    }
+  }catch(e){ if(e && e.name === "AbortError"){ note(""); return; } }
+  try{
+    const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 8000);
+    markBackup();
+    note(name + " を書き出しました。見当たらなければ「文字でコピー」を。");
+  }catch(e){ note("書き出せませんでした。"); }
+}
+
+async function copyData(note){
+  try{ await navigator.clipboard.writeText(payload()); markBackup();
+    note("コピーしました。メモ帳などに貼って保存してください。"); }
+  catch(e){ note("コピーできませんでした。"); }
+}
+
+function importJSON(text, note){
+  let data;
+  try{ data = JSON.parse(text); }catch(e){ return note("中身を読み取れませんでした。"); }
+  const incoming = Array.isArray(data) ? data : (data && data.log);
+  if(!Array.isArray(incoming)) return note("この形式ではないようです。");
+
+  const cur = load();
+  // t があればそれで、無ければ日付と中身で重複を判定する
+  const key = x => (x.t ? "t" + x.t : "d" + x.d + "|" + (x.v || []).join(","));
+  const seen = new Set(cur.map(key));
+  let added = 0;
+  incoming.forEach(x => {
+    if(!x || !x.d || seen.has(key(x))) return;
+    seen.add(key(x)); cur.push(x); added++;
+  });
+  cur.sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : (b.t || 0) - (a.t || 0)));
+  if(!store(cur)) return note("保存できませんでした。空き容量をご確認ください。");
+  markBackup(); render();
+  note(added === 0 ? "新しい記録はありませんでした。" : added + " 件を追加しました。");
+}
+
+/* 空き容量不足による自動削除の対象から外す */
+async function askPersist(){
+  try{
+    if(!navigator.storage || !navigator.storage.persist) return null;
+    return await navigator.storage.persisted() || await navigator.storage.persist();
+  }catch(e){ return null; }
+}
+
+/* ============================================================
+   描画
+   ============================================================ */
+function render(){
+  const st = stats(), el = document.getElementById("screen");
+
+  if(st.total === 0){
+    el.innerHTML = '<div class="empty">まだ記録がありません。</div>' + demoButtons();
+    bind(); return;
+  }
+
+  const num = (v, label, hot) =>
+    '<div class="num' + (hot ? " hot" : "") + '"><b>' + v + "</b><span>" + label + "</span></div>";
+
+  // 格子。今週の土曜で終わるように、APP.weeks 週ぶん並べる
+  const end = new Date();
+  end.setDate(end.getDate() + (6 - end.getDay()));
+  const cur = new Date(end);
+  cur.setDate(cur.getDate() - (APP.weeks * 7 - 1));
+  const todayKey = dkey(new Date());
+
+  const cols = [];
+  for(let w = 0; w < APP.weeks; w++){
+    let col = "";
+    for(let i = 0; i < 7; i++){
+      const k = dkey(cur), day = st.byDay[k];
+      let cls = "d";
+      if(k > todayKey) cls += " none";
+      else if(day) cls += day.sum > APP.levels[1] ? " l3" : (day.sum > APP.levels[0] ? " l2" : " l1");
+      if(k === todayKey) cls += " today";
+      col += '<i class="' + cls + '" title="' + k + '"></i>';
+      cur.setDate(cur.getDate() + 1);
+    }
+    cols.push('<div class="col">' + col + "</div>");
+  }
+
+  const age = backupAge();
+  const when = age === null ? "まだ一度も書き出していません"
+             : age === 0 ? "今日、書き出しました" : age + "日前に書き出しました";
+
+  el.innerHTML =
+    '<div class="nums">'
+      + num(st.streak, APP.labels[0], st.streak >= APP.hotAt)
+      + num(st.total, APP.labels[1])
+      + num(st.best, APP.labels[2])
+    + "</div>"
+    + '<div class="grid-wrap"><div class="eyebrow">この' + Math.round(APP.weeks / 4.33) + "か月</div>"
+      + '<div class="grid"><div class="wd">'
+        + "日月火水木金土".split("").map(c => "<i>" + c + "</i>").join("")
+      + '</div><div class="cols">' + cols.join("") + "</div></div>"
+      + '<div class="legend"><span>多い日ほど濃く</span>'
+        + '<i class="d l1"></i><i class="d l2"></i><i class="d l3"></i></div>'
+    + "</div>"
+    + '<div class="list">' + st.list.slice(0, 40).map(x =>
+        '<div class="row"><span class="dt">' + x.d.replace(/-/g, ".") + " · "
+        + (x.v || []).length + '回</span><span class="vl">'
+        + (x.v || []).map(APP.fmt).join("  /  ") + "</span></div>").join("") + "</div>"
+    + '<div class="backup"><h2>記録の持ち出し</h2>'
+      + '<p class="' + (backupOverdue() ? "warn" : "") + '">' + when + "</p>"
+      + "<p>記録は端末の中だけにあります。ときどき書き出して、"
+      + "消えない場所に置いておいてください。</p>"
+      + '<div class="btns"><button class="btn" id="bkExport">書き出す</button>'
+      + '<button class="btn" id="bkImport">読み込む</button></div>'
+      + '<div class="btns"><button class="btn" id="bkCopy">文字でコピー</button>'
+      + '<button class="btn" id="bkPaste">貼り付けから</button></div>'
+      + '<div class="msg" id="bkMsg"></div><p id="bkStore"></p>'
+      + '<input type="file" id="bkFile" accept="application/json,.json" hidden></div>'
+    + demoButtons();
+
+  bind();
+}
+
+// 本番では「全部消す」を誤って押さないよう、URL の末尾が #demo のときだけ出す
+function demoButtons(){
+  if(location.hash !== "#demo") return "";
+  return '<div class="backup"><h2>動作確認用</h2>'
+    + '<div class="btns"><button class="btn" id="dmAdd">サンプルを入れる</button>'
+    + '<button class="btn" id="dmClear">全部消す</button></div></div>';
+}
+
+function bind(){
+  const msg = document.getElementById("bkMsg");
+  const note = t => { if(msg) msg.textContent = t; };
+  const on = (id, fn) => { const e = document.getElementById(id); if(e) e.addEventListener("click", fn); };
+
+  on("bkExport", () => exportData(note));
+  on("bkCopy", () => copyData(note));
+  on("bkImport", () => document.getElementById("bkFile").click());
+  on("bkPaste", async () => {
+    try{ importJSON(await navigator.clipboard.readText(), note); }
+    catch(e){ note("貼り付けを読めませんでした。"); }
+  });
+  const f = document.getElementById("bkFile");
+  if(f) f.addEventListener("change", e => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const fr = new FileReader();
+    fr.onload = () => importJSON(String(fr.result), note);
+    fr.readAsText(file);
+    e.target.value = "";
+  });
+
+  on("dmAdd", () => {
+    const list = load();
+    for(let i = 0; i < 40; i++){
+      if(i % 7 === 3) continue;                       // ところどころ休む
+      const off = Math.floor(i * 1.25);
+      list.push({ t: Date.now() - i * 86400000, d: dshift(dkey(new Date()), -off),
+                  v: [10 + (i % 3) * 5, 20, 15].slice(0, 1 + (i % 3)) });   // 分
+    }
+    store(list); render();
+  });
+  on("dmClear", () => { localStorage.removeItem(APP.storeKey);
+    localStorage.removeItem(APP.backupKey); render(); });
+
+  askPersist().then(ok => {
+    const e = document.getElementById("bkStore");
+    if(!e) return;
+    e.textContent = ok === true ? "保存領域は自動削除から保護されています。"
+                  : ok === false ? "保存領域の保護は得られませんでした。書き出しをこまめに。" : "";
+  });
+}
+
+render();
+</script>
+
+<script>
+"use strict";
+
+/* ============================================================
+   チャイム
+   CHIME_URL に音声ファイル（同じフォルダの mp3 など）を入れると、それを鳴らす。
+   空のあいだは、仮の鐘の音を合成して鳴らす。
+   ============================================================ */
+const CHIME_URL = "tingshaLong.mp3";
+
+let ctx = null, chimeBuf = null, master = null;
+
+// ページを開いた時点で用意しておく（最初のチャイムから本物の音で鳴らすため）。
+// 止まった状態で作られるので、鳴らせるのはタップ後の audioInit から。
+function audioPrepare(){
+  // iOS のマナースイッチで Web Audio が無音にならないようにする
+  try{ if(navigator.audioSession) navigator.audioSession.type = "playback"; }catch(e){}
+  if(!ctx){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC();
+    master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
+    chimeBuf = synthBell(ctx);
+    if(CHIME_URL) fetch(CHIME_URL).then(r => r.arrayBuffer())
+      .then(ab => new Promise((ok, ng) => ctx.decodeAudioData(ab, ok, ng)))
+      .then(b => { chimeBuf = b; }).catch(() => {});
+  }
+}
+audioPrepare();
+
+function audioInit(){
+  audioPrepare();
+  // iOS は、タップの中で resume しないと音が出ない
+  if(ctx.state !== "running") ctx.resume();
+}
+
+// 仮の鐘。おりんのように長く余韻が残る音
+function synthBell(c){
+  const sr = c.sampleRate, len = Math.floor(sr * 11), buf = c.createBuffer(1, len, sr);
+  const out = buf.getChannelData(0);
+  const f0 = 262;
+  const parts = [ // [倍音比, 強さ, 減衰(秒)]
+    [1, 1, 7.5], [1.004, .6, 7], [2.71, .45, 4.2], [5.05, .22, 2.2], [8.2, .1, 1.1]
+  ];
+  let peak = 0;
+  for(let i = 0; i < len; i++){
+    const t = i / sr, atk = Math.min(1, t / 0.004);
+    let s = 0;
+    for(const [r, a, d] of parts) s += a * Math.exp(-t / d * 2.3) * Math.sin(2 * Math.PI * f0 * r * t);
+    s *= atk;
+    out[i] = s; if(Math.abs(s) > peak) peak = Math.abs(s);
+  }
+  for(let i = 0; i < len; i++) out[i] /= peak * 1.1;
+  return buf;
+}
+
+// when は ctx の時計（秒）。返した source は、鳴る前なら止められる
+function chimeAt(when){
+  const s = ctx.createBufferSource();
+  s.buffer = chimeBuf; s.connect(master); s.start(when);
+  return { src: s, when };
+}
+
+/* ============================================================
+   設定
+   ============================================================ */
+const CFG_KEY = "meditation.cfg";
+const LIMITS = {
+  interval: { min: 0,  max: 600,  step: 5,  def: 30 },     // 秒
+  med:      { min: 1,  max: 180,  step: 1,  def: 20 },     // 分
+  wake:     { min: 30, max: 1800, step: 30, def: 120 }     // 秒
+};
+let cfg = loadCfg();
+
+function loadCfg(){
+  const c = {};
+  let saved = {};
+  try{ saved = JSON.parse(localStorage.getItem(CFG_KEY) || "{}") || {}; }catch(e){}
+  for(const k in LIMITS){
+    const L = LIMITS[k], v = Number(saved[k]);
+    c[k] = Number.isFinite(v) ? Math.min(L.max, Math.max(L.min, v)) : L.def;
+  }
+  return c;
+}
+function saveCfg(){ try{ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }catch(e){} }
+
+function fmtSec(s){
+  const m = Math.floor(s / 60), r = s % 60;
+  return m ? m + "分" + (r ? r + "秒" : "") : r + "秒";
+}
+function fmtClock(sec){
+  sec = Math.max(0, Math.ceil(sec));
+  return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
+}
+
+function showCfg(){
+  document.querySelectorAll(".stp").forEach(el => {
+    const k = el.dataset.k;
+    el.querySelector("output").textContent = k === "med" ? cfg.med + "分" : fmtSec(cfg[k]);
+  });
+  if(!run) showIdle();
+}
+
+document.querySelectorAll(".stp button").forEach(b => {
+  const k = b.parentElement.dataset.k, d = Number(b.dataset.d);
+  const bump = () => {
+    const L = LIMITS[k];
+    cfg[k] = Math.min(L.max, Math.max(L.min, cfg[k] + d * L.step));
+    showCfg();
+  };
+  // 押しっぱなしで連続して変わる
+  let hold = null, rep = null;
+  const stop = () => { clearTimeout(hold); clearInterval(rep); hold = rep = null; saveCfg(); };
+  b.addEventListener("pointerdown", e => {
+    e.preventDefault(); bump();
+    hold = setTimeout(() => { rep = setInterval(bump, 90); }, 450);
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(t => b.addEventListener(t, stop));
+  b.addEventListener("contextmenu", e => e.preventDefault());
+});
+
+/* ============================================================
+   タイマー
+   時間は「スタートした時刻」からの差で毎回計算する。
+   setInterval の回数で数えると、画面を離れたときにずれる。
+   チャイムは Web Audio の時計に先に予約しておく（裏に回っても鳴るように）。
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const ARC = 2 * Math.PI * 92;
+$("tmArc").style.strokeDasharray = ARC;
+
+let run = null, timer = null, wakeLock = null;
+
+function start(){
+  audioInit();
+  const t0 = Date.now();
+  const tA = t0 + cfg.interval * 1000;
+  const tB = tA + cfg.med * 60000;
+  const tC = tB + cfg.wake * 1000;
+  run = { t0, tA, tB, tC, med: cfg.med, saved: false, chimes: [] };
+  $("tmAsk").hidden = true; $("tmDone").textContent = "";
+  schedule(true);
+  lockScreen();
+  timer = setInterval(tick, 250);
+  tick();
+}
+
+// まだ鳴っていないチャイムを、今の時計に合わせて予約し直す
+// first は最初の予約。「はじまりまで 0 秒」のときは、すぐ鳴らす
+function schedule(first){
+  if(!run || !ctx) return;
+  const now = Date.now(), ct = ctx.currentTime;
+  run.chimes.forEach(c => { if(c.when > ct + 0.05){ try{ c.src.stop(); }catch(e){} } });
+  run.chimes = run.chimes.filter(c => c.when <= ct + 0.05);
+  [run.tA, run.tB, run.tC].forEach(w => {
+    if(w > now + 50) run.chimes.push(chimeAt(ct + (w - now) / 1000));
+    else if(first === true) run.chimes.push(chimeAt(ct + 0.05));
+  });
+}
+
+function tick(){
+  if(!run) return;
+  const now = Date.now();
+  let phase, left, total, next;
+  if(now < run.tA){ phase = "prep"; left = run.tA - now; total = run.tA - run.t0; next = "まもなく瞑想"; }
+  else if(now < run.tB){ phase = "med"; left = run.tB - now; total = run.med * 60000; next = "瞑想 " + run.med + "分"; }
+  else if(now < run.tC){ phase = "wake"; left = run.tC - now; total = run.tC - run.tB; next = "ゆっくり目を開けて"; }
+  else phase = "done";
+
+  if(now >= run.tB && !run.saved){ run.saved = true; saveSession(run.med); }
+  if(phase === "done") return finish();
+
+  $("tmPhase").textContent = { prep: "はじまりまで", med: "瞑想", wake: "覚醒" }[phase];
+  $("tmRing").className = "tm-ring " + phase;
+  $("tmTime").textContent = fmtClock(left / 1000);
+  $("tmNext").textContent = next;
+  $("tmArc").style.strokeDashoffset = ARC * (1 - left / total);
+  const n = phase === "prep" ? 0 : phase === "med" ? 1 : 2;
+  $("tmSteps").querySelectorAll("i").forEach((e, i) => e.classList.toggle("on", i < n));
+}
+
+function saveSession(min){
+  const list = load(), k = dkey(new Date());
+  // その日の記録が既にあれば、v に足す（1日1件。v の長さが「何回目」になる）
+  const today = list.find(x => x.d === k);
+  if(today) today.v = (today.v || []).concat(min);
+  else list.unshift({ t: Date.now(), d: k, v: [min] });
+  store(list);
+  render();
+  return (today ? today.v.length : 1);
+}
+
+function todayCount(){
+  const k = dkey(new Date()), r = load().find(x => x.d === k);
+  return r ? (r.v || []).length : 0;
+}
+
+function finish(){
+  clearInterval(timer); timer = null;
+  run = null; unlockScreen();
+  $("tmPhase").textContent = "おわり";
+  $("tmRing").className = "tm-ring";
+  $("tmArc").style.strokeDashoffset = ARC;
+  $("tmTime").textContent = "0:00";
+  $("tmNext").textContent = "";
+  $("tmSteps").querySelectorAll("i").forEach(e => e.classList.add("on"));
+  $("tmDone").textContent = "おつかれさまでした。今日 " + todayCount() + " 回目の瞑想を記録しました。";
+  setRunning(false, true);
+}
+
+// 中止。瞑想の途中なら、ここまでを記録するか聞く
+function abort(){
+  const r = run;
+  clearInterval(timer); timer = null;
+  r.chimes.forEach(c => { try{ c.src.stop(); }catch(e){} });
+  run = null; unlockScreen();
+  setRunning(false);
+  const now = Date.now();
+  if(now >= r.tA && now < r.tB){
+    const min = Math.floor((now - r.tA) / 60000);
+    if(min >= 1){
+      $("tmAskText").textContent = "ここまで " + min + "分 瞑想しました。記録しますか？";
+      $("tmAsk").hidden = false;
+      $("tmAskSave").onclick = () => {
+        $("tmAsk").hidden = true; saveSession(min);
+        $("tmDone").textContent = "今日 " + todayCount() + " 回目の瞑想を記録しました。";
+      };
+      $("tmAskDrop").onclick = () => { $("tmAsk").hidden = true; };
+    }
+  }else if(now >= r.tB){
+    $("tmDone").textContent = "今日 " + todayCount() + " 回目の瞑想を記録しました。";
+  }
+}
+
+function setRunning(on, keepFace){
+  $("tmSet").hidden = on; $("tmTest").hidden = on; $("tmHint").hidden = on;
+  $("tmMain").textContent = on ? "中止" : "スタート";
+  $("tmMain").classList.toggle("stop", on);
+  if(!on && !keepFace) showIdle();
+}
+
+function showIdle(){
+  $("tmPhase").textContent = "静かに座る";
+  $("tmRing").className = "tm-ring";
+  $("tmTime").textContent = fmtClock(cfg.med * 60);
+  $("tmNext").textContent = "はじまりまで " + fmtSec(cfg.interval) + " · 覚醒 " + fmtSec(cfg.wake);
+  $("tmArc").style.strokeDashoffset = 0;
+  $("tmSteps").querySelectorAll("i").forEach(e => e.classList.remove("on"));
+}
+
+$("tmMain").addEventListener("click", () => {
+  if(run) abort();
+  else { setRunning(true); start(); }
+});
+$("tmTest").addEventListener("click", () => { audioInit(); chimeAt(ctx.currentTime + 0.05); });
+
+/* 画面が消えないようにする（消えると iOS は音も止まる） */
+async function lockScreen(){
+  try{ if("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); }catch(e){}
+}
+function unlockScreen(){ try{ if(wakeLock) wakeLock.release(); }catch(e){} wakeLock = null; }
+
+// アプリに戻ってきたら、音の時計を起こしてチャイムを予約し直す
+document.addEventListener("visibilitychange", () => {
+  if(document.visibilityState !== "visible" || !run) return;
+  lockScreen();
+  if(ctx) ctx.resume().then(() => schedule()).catch(() => schedule());
+  tick();
+});
+
+/* ============================================================
+   タブ
+   ============================================================ */
+function tab(name){
+  $("viewTimer").hidden = name !== "timer";
+  $("viewRecord").hidden = name !== "record";
+  $("tabTimer").classList.toggle("on", name === "timer");
+  $("tabRecord").classList.toggle("on", name === "record");
+  if(name === "record") render();
+  window.scrollTo(0, 0);
+}
+$("tabTimer").addEventListener("click", () => tab("timer"));
+$("tabRecord").addEventListener("click", () => tab("record"));
+
+showCfg();
+
+/* オフラインで動くように（https か localhost のときだけ効く） */
+if("serviceWorker" in navigator && location.protocol !== "file:"){
+  window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); });
+}
+</script>
+</body>
+</html>
