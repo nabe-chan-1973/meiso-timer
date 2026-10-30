@@ -7,7 +7,7 @@
    チャイムの mp3 も最初に貯めておくので、オフラインでも鳴る。
    Google Fonts は取れたときに一緒に貯めておく。 */
 
-const VERSION = "v3";   // index.html を更新したら、ここも上げると確実に配り直せる
+const VERSION = "v4";   // index.html を更新したら、ここも上げると確実に配り直せる
 const CACHE = "meiso-" + VERSION;
 
 const ASSETS = [

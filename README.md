@@ -2,7 +2,7 @@
 
 チャイム3回で区切る瞑想タイマー。単一HTMLのPWAで、オフラインでも動きます。
 
-https://nabe-chan-1973.github.io/meiso/
+https://nabe-chan-1973.github.io/meiso-timer/
 
 ## 流れ
 
