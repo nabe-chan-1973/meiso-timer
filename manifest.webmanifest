@@ -3,6 +3,7 @@
   "short_name": "瞑想",
   "description": "チャイム3回で区切る瞑想タイマー。はじまりまで・瞑想・覚醒の時間を設定でき、実践を記録します。",
   "lang": "ja",
+  "id": "./?app=meditation",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
