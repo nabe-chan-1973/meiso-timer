@@ -7,8 +7,8 @@
    チャイムの mp3 も最初に貯めておくので、オフラインでも鳴る。
    Google Fonts は取れたときに一緒に貯めておく。 */
 
-const VERSION = "v2";   // index.html を更新したら、ここも上げると確実に配り直せる
-const CACHE = "meditation-" + VERSION;
+const VERSION = "v3";   // index.html を更新したら、ここも上げると確実に配り直せる
+const CACHE = "meiso-" + VERSION;
 
 const ASSETS = [
   "./",
@@ -45,6 +45,16 @@ self.addEventListener("fetch", e => {
   const url = new URL(req.url);
   const isFont = /(^|\.)fonts\.(googleapis|gstatic)\.com$/.test(url.hostname);
   if (url.origin !== self.location.origin && !isFont) return;
+
+  // manifest だけはネット優先。古いものを返すと、Android がアプリの
+  // 名前や ID の変更に気づけず、インストールがおかしくなる
+  if (url.origin === self.location.origin && url.pathname.endsWith(".webmanifest")) {
+    e.respondWith(fetch(req).then(res => {
+      if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
+      return res;
+    }).catch(() => caches.match(req, { ignoreSearch: true })));
+    return;
+  }
 
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
